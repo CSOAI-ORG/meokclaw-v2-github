@@ -1,0 +1,65 @@
+{
+  "name": "meokclaw-vscode",
+  "displayName": "MEOKCLAW — Sovereign AI Assistant",
+  "description": "Dual-brain AI routing with cost transparency",
+  "version": "0.1.0",
+  "publisher": "nicholas",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Machine Learning", "Debuggers", "Other"],
+  "keywords": ["ai", "llm", "openrouter", "cost", "routing"],
+  "activationEvents": ["onCommand:meokclaw.ask"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "meokclaw.ask",
+        "title": "Ask MEOKCLAW",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "meokclaw.explain",
+        "title": "MEOKCLAW: Explain this code"
+      },
+      {
+        "command": "meokclaw.council",
+        "title": "MEOKCLAW: Council mode (multi-model)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "meokclaw.explain",
+          "group": "2_meokclaw@1",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "MEOKCLAW",
+      "properties": {
+        "meokclaw.apiBase": {
+          "type": "string",
+          "default": "http://localhost:3201",
+          "description": "MEOKCLAW API base URL"
+        },
+        "meokclaw.defaultMode": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "fast", "left", "right", "both", "council"],
+          "description": "Default routing mode"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

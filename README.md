@@ -1,15 +1,16 @@
 # MEOKCLAW v2 — Sovereign Dual-Brain Intelligence OS
 
-> **The only AI router that learns from every conversation, runs models in parallel council mode, and shows you exactly how much money you saved.**
+> Legacy routing and reliability components. See the [integration and migration status](docs/RELIABILITY_MIGRATION.md) before using them in a running application.
 
-[![Tests](https://img.shields.io/badge/tests-17%2F17%20passing-brightgreen)](./test_e2e.py)
-[![Version](https://img.shields.io/badge/version-2.2.0-blue)](./dual_brain_api.py)
+[![CI](https://github.com/CSOAI-ORG/meokclaw-v2-github/actions/workflows/ci.yml/badge.svg)](https://github.com/CSOAI-ORG/meokclaw-v2-github/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue)](./src/api.py)
 [![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE)
-[![Deploy](https://img.shields.io/badge/deployed%20on-Vercel-black)](https://meokclaw-v2.vercel.app)
+
+**Current verification:** offline helper regression tests run in CI. Structured output needs an explicit host adapter; unscoped legacy cache calls bypass. API wiring, missing runtime dependencies and historical demo/benchmark claims are described in the migration document. These source changes do not deploy the app.
 
 ---
 
-## 🧠 What is this?
+## Archived project description
 
 MEOKCLAW is a **sovereign AI orchestrator** that routes your queries to the optimal model — or multiple models — based on what you're actually asking. It doesn't just call GPT-4 for everything. It thinks first.
 
@@ -26,7 +27,7 @@ MEOKCLAW is a **sovereign AI orchestrator** that routes your queries to the opti
 
 ---
 
-## 🚀 Live Demo
+## Historical demo links (deployment not verified)
 
 - **Chat Interface**: [meokclaw-v2.vercel.app](https://meokclaw-v2.vercel.app)
 - **Model Arena**: [meokclaw-v2.vercel.app/arena](https://meokclaw-v2.vercel.app/arena)
@@ -35,7 +36,7 @@ MEOKCLAW is a **sovereign AI orchestrator** that routes your queries to the opti
 
 ---
 
-## 📊 Cost Comparison
+## Archived cost illustration (not a measured current saving)
 
 | Provider | Cost per 1K tokens (input) | Cost per 1K tokens (output) | Speed | Quality |
 |---|---|---|---|---|
@@ -78,38 +79,18 @@ MEOKCLAW is a **sovereign AI orchestrator** that routes your queries to the opti
 
 ---
 
-## 🛠️ Quick Start
-
-### One-Command Setup (Docker)
+## Run the verified offline checks
 
 ```bash
-git clone https://github.com/nicholas/meokclaw.git
-cd meokclaw
-cp .env.example .env
-# Add your OpenRouter API key to .env
-docker compose up
-```
-
-Visit `http://localhost:3000`
-
-### Manual Setup
-
-```bash
-# 1. Clone
-git clone https://github.com/nicholas/meokclaw.git
-cd meokclaw
-
-# 2. Backend
+git clone https://github.com/CSOAI-ORG/meokclaw-v2-github.git
+cd meokclaw-v2-github
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-python dual_brain_api.py
-
-# 3. Frontend (new terminal)
-cd meokclaw-v2
-npm install
-npm run dev
+python -m pip install -r requirements-reliability.txt
+python -m unittest discover -s tests -p 'test_reliability.py' -v
 ```
+
+The full Docker/API quick start remains blocked by missing tracked runtime components. See [runtime blockers and migration requirements](docs/RELIABILITY_MIGRATION.md#what-is-not-wired-in-this-repository) before starting services.
 
 ---
 
@@ -162,29 +143,13 @@ Response:
 
 ---
 
-## 🧪 Test Suite
+## Test suites
 
-```bash
-python test_e2e.py
-```
-
-```
-test_router_keyword_routing ............... PASS
-test_router_ml_classification .............. PASS
-test_crisis_override ....................... PASS
-test_openrouter_client ..................... PASS
-test_ollama_fallback ....................... PASS
-both_hemisphere_fusion ..................... PASS
-cost_tracking_accuracy ..................... PASS
-arena_parallel_execution ................... PASS
-council_bft_consensus ...................... PASS
-api_health_endpoint ........................ PASS
-17/17 tests passing ✅
-```
+CI runs the focused offline reliability suite above on Python 3.11 and 3.12. The legacy live suite is [tests/test_e2e.py](tests/test_e2e.py); it has not been revalidated as an end-to-end deployment gate.
 
 ---
 
-## 📈 Benchmarks
+## Archived benchmark figures (not validated by current CI)
 
 | Metric | Value |
 |---|---|
@@ -198,6 +163,8 @@ api_health_endpoint ........................ PASS
 ---
 
 ## 🗺️ Roadmap
+
+Historical checklist; checked items below are not a release-readiness assertion. Current integration gaps are recorded above.
 
 - [x] Dual-Brain Router (keyword + ML)
 - [x] Cost Arena with real-time comparison

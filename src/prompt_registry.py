@@ -277,9 +277,8 @@ class PromptRegistry:
         m.avg_latency_ms = (m.avg_latency_ms * (n - 1) + latency_ms) / n
         m.avg_tokens_out = (m.avg_tokens_out * (n - 1) + tokens_out) / n
 
-        if not success:
-            # Approximate success rate
-            m.success_rate = (m.success_rate * (n - 1)) / n
+        # Include both successful and failed calls in the running mean.
+        m.success_rate = (m.success_rate * (n - 1) + int(success)) / n
 
     def end_ab_test(self, test_id: str, winner_id: Optional[str] = None) -> PromptTest:
         """End an A/B test and optionally declare a winner."""
@@ -326,8 +325,9 @@ class PromptRegistry:
         metrics = [self._metrics.get(v.id) for v in versions if v.id in self._metrics]
 
         total_calls = sum(m.calls for m in metrics if m)
-        avg_cost = sum(m.avg_cost_usd for m in metrics if m) / max(len(metrics), 1)
-        avg_latency = sum(m.avg_latency_ms for m in metrics if m) / max(len(metrics), 1)
+        # A version with one call must not weigh as much as one with 100 calls.
+        avg_cost = sum(m.avg_cost_usd * m.calls for m in metrics if m) / max(total_calls, 1)
+        avg_latency = sum(m.avg_latency_ms * m.calls for m in metrics if m) / max(total_calls, 1)
 
         return {
             "name": name,

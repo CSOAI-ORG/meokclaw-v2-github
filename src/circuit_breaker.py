@@ -1,13 +1,13 @@
 """Circuit Breaker + Auto-Failover for MEOKCLAW
 
-Production-grade reliability layer. When a model degrades, automatically
-route to fallback. Restore when healthy.
+Per-model reliability helper. Fallback dispatch must be supplied by the host.
+This module does not select or authorize a model provider.
 
 Features:
 - Per-model health tracking (success rate, latency, error rate)
 - Circuit breaker states: CLOSED, OPEN, HALF_OPEN
 - Automatic fallback chain (cloud → local → cached)
-- Exponential backoff for recovery probes
+- Configured fixed timeout for recovery probes
 - Health check dashboard endpoint
 - Configurable thresholds per model
 
@@ -18,12 +18,14 @@ Usage:
     circuit_breaker.register("deepseek-v4-pro", {
         "fallback_chain": ["deepseek-v4-flash", "kimi-k2.6", "llama3.1:8b"],
         "error_threshold": 0.5,  # Trip at 50% error rate
-        "latency_threshold_ms": 10000,  # Trip at >10s latency
+        "latency_threshold_ms": 10000,  # Reserved; latency is measured, not a trip gate
         "recovery_timeout": 30,  # Try again after 30s
     })
     
     # Use wrapped inference
-    result = await circuit_breaker.call("deepseek-v4-pro", infer_fn)
+    result = await circuit_breaker.call(
+        "deepseek-v4-pro", infer_fn, fallback_fn=dispatch_authorized_model
+    )
 """
 from __future__ import annotations
 
@@ -32,6 +34,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 from enum import Enum
+
+
+class FallbackUnavailableError(RuntimeError):
+    """No configured dispatcher/model could provide a fallback result."""
 
 
 class CircuitState(Enum):
@@ -61,7 +67,7 @@ class CircuitBreaker:
 
     DEFAULT_CONFIG = {
         "error_threshold": 0.5,        # Trip if error rate > 50%
-        "latency_threshold_ms": 15000,  # Trip if p95 latency > 15s
+        "latency_threshold_ms": 15000,  # Reserved; not currently a trip gate
         "min_requests": 5,             # Need at least 5 requests before tripping
         "consecutive_failures": 3,     # Or 3 consecutive failures
         "recovery_timeout": 30,        # Seconds before HALF_OPEN
@@ -122,6 +128,7 @@ class CircuitBreaker:
                 health.consecutive_successes = 0
                 health.success_count = 0
                 health.failure_count = 0
+                health.total_latency_ms = 0  # Start a consistent new recovery window
 
     def _record_failure(self, health: ModelHealth):
         health.failure_count += 1
@@ -159,7 +166,8 @@ class CircuitBreaker:
     ) -> Any:
         """
         Call inference with circuit breaker protection.
-        Returns fallback result if circuit is open.
+        Returns fallback result if circuit is open and a dispatcher is supplied.
+        Without one, raises FallbackUnavailableError without retrying the primary.
         """
         if model_id not in self._health:
             self.register(model_id)
@@ -175,10 +183,10 @@ class CircuitBreaker:
             return await self._fallback(model_id, infer_fn, fallback_fn)
 
         # Try primary model
-        start = time.time()
+        start = time.perf_counter()
         try:
             result = await infer_fn()
-            latency = int((time.time() - start) * 1000)
+            latency = int((time.perf_counter() - start) * 1000)
             self._record_success(health, latency)
             return result
         except Exception as e:
@@ -193,35 +201,44 @@ class CircuitBreaker:
         original_fn: Callable,
         fallback_fn: Optional[Callable],
     ) -> Any:
-        """Try fallback chain."""
-        chain = self._fallback_chains.get(model_id, [])
+        """Dispatch to a different model only through an explicit dispatcher.
 
-        for fallback_model in chain:
+        original_fn is retained for compatibility with callers of this helper;
+        it cannot select a fallback model and must never be called here.
+        """
+        chain = self._fallback_chains.get(model_id, [])
+        if not chain:
+            raise FallbackUnavailableError(f"No fallback models configured for {model_id}")
+        if fallback_fn is None:
+            raise FallbackUnavailableError(
+                f"Fallback for {model_id} requires fallback_fn(model_id); "
+                "the original callback cannot select another model"
+            )
+
+        last_error = None
+        # A duplicate/self entry must not retry the primary under another label.
+        for fallback_model in dict.fromkeys(chain):
+            if fallback_model == model_id:
+                continue
             if fallback_model not in self._health:
                 self.register(fallback_model)
-
             fb_health = self._health[fallback_model]
+            self._check_recovery(fb_health)
             if fb_health.state == CircuitState.OPEN:
                 continue
-
+            start = time.perf_counter()
             try:
-                # If custom fallback function provided, use it
-                if fallback_fn:
-                    result = await fallback_fn(fallback_model)
-                else:
-                    # Otherwise try the same function with different model
-                    result = await original_fn()
-
-                fb_health.success_count += 1
-                fb_health.last_success_time = time.time()
-                return result
-            except Exception:
-                fb_health.failure_count += 1
-                fb_health.consecutive_failures += 1
+                result = await fallback_fn(fallback_model)
+            except Exception as exc:
+                self._record_failure(fb_health)
+                last_error = exc
                 continue
+            self._record_success(fb_health, int((time.perf_counter() - start) * 1000))
+            return result
 
-        # All fallbacks failed
-        raise Exception(f"All models in fallback chain failed for {model_id}")
+        raise FallbackUnavailableError(
+            f"All models in fallback chain unavailable for {model_id}"
+        ) from last_error
 
     def health_status(self, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Get health status for all or one model."""

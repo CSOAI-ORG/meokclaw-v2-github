@@ -25,7 +25,7 @@ Construct `StructuredOutputEngine(completion_fn=host_completion)`. The host adap
 
 The engine forwards the requested model unchanged. It appends the complete Pydantic JSON Schema to the supplied system prompt. Provider errors propagate; only invalid response JSON/schema triggers correction attempts. The historical `max_retries` parameter still means maximum total attempts; `retry_count` now reports retries after the initial attempt.
 
-JSON is parsed strictly: no duplicate keys, NaN/Infinity, quote replacement, trailing-comma repair or surrounding prose. A single fenced JSON value is accepted. Pydantic validation runs in strict mode, so callers relying on string-to-number coercion must adapt their schema or producer.
+JSON is parsed strictly: no duplicate keys, non-finite numbers (including NaN/Infinity and exponent overflow such as `1e999` at any depth), quote replacement, trailing-comma repair or surrounding prose. A single fenced JSON value is accepted. Pydantic validation runs in strict mode, so callers relying on string-to-number coercion must adapt their schema or producer.
 
 `function_call` validates a proposal and never executes it. It accepts the original parameter-property map (with per-property `required: true`) or a JSON Schema 2020-12 object schema. Unknown function names, duplicate definitions, invalid enums, wrong types, missing required fields and extra top-level call fields are rejected. Parameter `additionalProperties` defaults to false; an explicitly supplied true/schema remains the caller's policy. Nested constraints and local references are validated. External schema references and nonlocal schema identifiers are disabled; validation cannot fetch remote schema resources.
 
@@ -71,6 +71,6 @@ python -m pip install -r requirements-reliability.txt
 python -m unittest discover -s tests -p 'test_reliability.py' -v
 ```
 
-The 29 focused tests cover the reproduced arithmetic/dispatch regressions, strict function proposals, provider metadata/error handling, tenant/principal/revision separation, TTL/capacity and wrapper bypass. Socket connection APIs are blocked during the suite. CI runs the suite on Python 3.11 and 3.12 and compiles the source. No API keys, model calls, GPU, service container or live endpoint is required.
+The 30 focused tests cover the reproduced arithmetic/dispatch regressions, strict function proposals, provider metadata/error handling, tenant/principal/revision separation, TTL/capacity and wrapper bypass. Socket connection APIs are blocked during the suite. CI runs the suite on Python 3.11 and 3.12 and compiles the source. No API keys, model calls, GPU, service container or live endpoint is required.
 
 `tests/test_e2e.py` is a separate legacy/live integration suite. Its historical README results are not evidence that it passes on this checkout; it is deliberately not included in offline CI.

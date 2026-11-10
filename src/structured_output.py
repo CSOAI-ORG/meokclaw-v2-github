@@ -58,6 +58,13 @@ def _reject_constant(value):
     raise ValueError(f"Non-finite JSON number: {value}")
 
 
+def _finite_float(value):
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"Non-finite JSON number from exponent overflow: {value}")
+    return parsed
+
+
 def _deny_retrieval(uri):
     raise ValueError("External JSON Schema references are disabled")
 
@@ -203,6 +210,7 @@ class StructuredOutputEngine:
                     self._extract_json(raw_text),
                     object_pairs_hook=_unique_object,
                     parse_constant=_reject_constant,
+                    parse_float=_finite_float,
                 )
                 validated = schema.model_validate(data, strict=True)
                 return StructuredResult(

@@ -272,6 +272,31 @@ class StructuredTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.retry_count, 0)
                 self.assertEqual(len(backend.calls), 1)
 
+    async def test_exponent_overflow_is_rejected_in_float_fields_and_nested_values(self):
+        class Numbers(BaseModel):
+            value: float
+            nested: dict[str, list[float]]
+
+        # Generic float schemas normally accept infinity. Both signs and every
+        # nesting level must be rejected by JSON decoding before validation.
+        for response in [
+            '{"value":1e999,"nested":{"values":[1]}}',
+            '{"value":1,"nested":{"values":[-1e999]}}',
+            '{"value":-1e999,"nested":{"values":[]}}',
+        ]:
+            with self.subTest(response=response):
+                backend = FakeCompletion(response)
+                result = await StructuredOutputEngine(backend).infer(
+                    "numbers", Numbers, max_retries=1,
+                )
+                self.assertFalse(result.parsed)
+                self.assertIn("Non-finite", result.validation_errors[0])
+                self.assertEqual(len(backend.calls), 1)
+        valid = FakeCompletion('{"value":1e100,"nested":{"values":[-2.5e-3]}}')
+        result = await StructuredOutputEngine(valid).infer("numbers", Numbers, max_retries=1)
+        self.assertTrue(result.parsed)
+        self.assertEqual(result.data.nested["values"], [-0.0025])
+
     async def test_provider_failure_is_not_retried_as_json_failure(self):
         backend = FakeCompletion(OSError("offline"))
         with self.assertRaises(OSError):
